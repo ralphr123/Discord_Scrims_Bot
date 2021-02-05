@@ -1,0 +1,23 @@
+{
+  "name": "discord_dui",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ralphr123/Discord_DUI.git"
+  },
+  "author": "Ralph",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/ralphr123/Discord_DUI/issues"
+  },
+  "homepage": "https://github.com/ralphr123/Discord_DUI#readme",
+  "dependencies": {
+    "discord.js": "^12.5.1",
+    "dotenv": "^8.2.0"
+  }
+}
