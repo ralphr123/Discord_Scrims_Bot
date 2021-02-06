@@ -92,7 +92,7 @@ bot.on('message', msg => {
                 split.radiant.forEach(gamer => gamer.guildMember.voice.setChannel('807068609377206332'));
                 split.dire.forEach(gamer => gamer.guildMember.voice.setChannel('807076385604632596'));
                 console.log(split);
-                msg.channel.send(`Successful. Winrate disparity: ${split.disparity}`)
+                msg.channel.send(`Successfully started session. Winrate disparity: ${split.disparity}`)
             }
 
         });
