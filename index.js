@@ -22,12 +22,22 @@ bot.on('ready', () => {
     console.info(`Logged in as ${bot.user.tag}`);
 });
 
-const evenlySplit = (arr) => {
-    arr.sort((a, b) => b.winrate - a.winrate);
+const splitGroup = (arr, format = 'balanced') => {
     const split = {
         radiant: [],
         dire: [],
         disparity: '0%'
+    }
+    if (format === 'balanced') {
+        arr.sort((a, b) => b.winrate - a.winrate);
+    } else {
+        let j = arr.length;
+        while (j) {
+            let randomInd = Math.floor(Math.random() * j);
+            j--;
+
+            [arr[j], arr[randomInd]] = [arr[randomInd], arr[j]];
+        }
     }
 
     for (let i = 0; i < arr.length; i++) {
@@ -38,16 +48,18 @@ const evenlySplit = (arr) => {
     let radiantAvg = split.radiant.reduce((a, b) => a + b.winrate, 0) / split.radiant.length;
     let direAvg = split.dire.reduce((a, b) => a + b.winrate, 0) / split.dire.length;
 
-    let j = 1;
-    while (((Math.min(radiantAvg, direAvg) / Math.max(radiantAvg, direAvg)) < 0.93) && j < Math.floor(arr.length/2)) {
-        [split.radiant[split.radiant.length - j], split.dire[split.dire.length - j]] = [split.dire[split.dire.length - j], split.radiant[split.radiant.length - j]];
-        radiantAvg = split.radiant.reduce((a, b) => a + b.winrate, 0) / split.radiant.length;
-        direAvg = split.dire.reduce((a, b) => a + b.winrate, 0) / split.dire.length;
-        j++;
+    if (format === 'balanced') {
+        let j = 1;
+        while (((Math.min(radiantAvg, direAvg) / Math.max(radiantAvg, direAvg)) < 0.93) && j < Math.floor(arr.length/2)) {
+            [split.radiant[split.radiant.length - j], split.dire[split.dire.length - j]] = [split.dire[split.dire.length - j], split.radiant[split.radiant.length - j]];
+            radiantAvg = split.radiant.reduce((a, b) => a + b.winrate, 0) / split.radiant.length;
+            direAvg = split.dire.reduce((a, b) => a + b.winrate, 0) / split.dire.length;
+            j++;
+        }
     }
 
-    split.disparity = `${(1 - (Math.min(radiantAvg, direAvg) / Math.max(radiantAvg, direAvg)))*100}%`
-    if (split.disparity == `NaN%`) split.disparity = "0%";
+    split.disparity = `${((1 - (Math.min(radiantAvg, direAvg) / Math.max(radiantAvg, direAvg)))*100).toPrecision(2)}%`
+    if (split.disparity == 'NaN%') split.disparity = "0%";
 
     return split;
 }
@@ -62,7 +74,12 @@ bot.on('message', msg => {
     const radiantChannel = bot.channels.cache.get('807068609377206332');
     const direChannel = bot.channels.cache.get('807076385604632596');
 
-    if (msg.content === '!dui' || msg.content === '!dui balanced' || msg.content === '!dui random') {
+    const movePlayersToGeneral = () => {
+        radiantChannel.members.forEach(guildMember => guildMember.voice.setChannel('807063354493108257'));
+        direChannel.members.forEach(guildMember => guildMember.voice.setChannel('807063354493108257'));
+    }
+
+    if ((msg.content === '!dui' || msg.content === '!dui balanced' || msg.content === '!dui random') && !inSession) {
         let commands = msg.content.split(" ");
         inSession = true;
         client.query('SELECT * FROM UserData', (err, res) => {
@@ -86,16 +103,17 @@ bot.on('message', msg => {
                 }
                 participants.push({ id: user.id, username: user.username, winrate: user.winrate, guildMember: member });
             });
-
-            if (!commands[1] || commands[1] === 'balanced') {
-                split = evenlySplit(participants);
-                split.radiant.forEach(gamer => gamer.guildMember.voice.setChannel('807068609377206332'));
-                split.dire.forEach(gamer => gamer.guildMember.voice.setChannel('807076385604632596'));
-                console.log(split);
-                msg.channel.send(`Successfully started session. Winrate disparity: ${split.disparity}`)
-            }
+            
+            split = splitGroup(participants, commands[1] === 'random' ? 'random' : 'balanced');
+            split.radiant.forEach(gamer => gamer.guildMember.voice.setChannel('807068609377206332'));
+            split.dire.forEach(gamer => gamer.guildMember.voice.setChannel('807076385604632596'));
+            console.log(split);
+            msg.channel.send(`Successfully started session. Winrate disparity: ${split.disparity}`)
+            
 
         });
+    } else if ((msg.content === '!dui' || msg.content === '!dui balanced' || msg.content === '!dui random') && inSession) {
+        msg.channel.send('Session already in progress. Use !winner [side] to pick a winner, or !terminate to cancel.');
     }
 
     if ((msg.content === '!winner dire' || msg.content === '!winner radiant') && inSession) {
@@ -104,11 +122,6 @@ bot.on('message', msg => {
 
         let sqlWinners = 'UPDATE UserData SET won = won + 1, winrate = won::real / (won::real + lost::real) WHERE id IN (';
         let sqlLosers = 'UPDATE UserData SET lost = lost + 1, winrate = won::real / (won::real + lost::real) WHERE id IN (';
-
-        const movePlayersToGeneral = () => {
-            radiantChannel.members.forEach(guildMember => guildMember.voice.setChannel('807063354493108257'));
-            direChannel.members.forEach(guildMember => guildMember.voice.setChannel('807063354493108257'));
-        }
 
         split[winningTeam].forEach(gamer => {
             sqlWinners += `'${gamer.id}', `;
@@ -145,8 +158,27 @@ bot.on('message', msg => {
                 });
             }
         });
-        
+    } else if ((msg.content === '!winner dire' || msg.content === '!winner radiant') && !inSession) {
+        msg.channel.send('No session in progress. Use !dui command to start a session.')
     }
+
+    if (msg.content === '!terminate' && inSession) {
+        msg.channel.send('Session terminated. Beep boop.');
+        split = {};
+        inSession = false;
+        movePlayersToGeneral();
+    } else if (msg.content === '!terminate' && !inSession) {
+        msg.channel.send('No session in progress. Use !dui command to start a session.')
+    }
+
+    if (msg.content === '!dui help') {
+        msg.channel.send("Commands (square brackets indicate user input):\n\n" + 
+        "!dui [balanced/random]: Starts a DUI session. Moves players in Main Lobby into their respective channels.\n\n" + 
+        "!winner [radiant/dire]: Ends a DUI session. Returns players to Main Lobby and updates player stats.\n\n" + 
+        "!terminate Ends a DUI session. Returns players into Main Lobby without updating player stats.");
+    }
+
+    
 });
 
 /* 
