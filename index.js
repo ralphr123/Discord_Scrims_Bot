@@ -2,6 +2,7 @@ require('dotenv').config()
 const Discord = require('discord.js');
 const { Client } = require('pg');
 
+// SQL SERVER
 const client = new Client({
     connectionString: process.env.DATABASE_URL,
     user: 'keuihxcmfzkagj',
@@ -10,18 +11,17 @@ const client = new Client({
         rejectUnauthorized: false
     }
 });
-
 client.connect();
 
-
+// DISCORD BOT
 const bot = new Discord.Client();
-
 bot.login(process.env.TOKEN);
 
 bot.on('ready', () => {
     console.info(`Logged in as ${bot.user.tag}`);
 });
 
+// Split teams randomly or based on winrate
 const splitGroup = (arr, format = 'balanced') => {
     const split = {
         radiant: [],
@@ -65,8 +65,8 @@ const splitGroup = (arr, format = 'balanced') => {
 }
 
 
-let inSession = false;
-let split;
+let inSession = false; // Has game started?
+let split; // Object used to store teams and winrate disparity
 
 bot.on('message', msg => {
     const participants = [];
@@ -79,6 +79,7 @@ bot.on('message', msg => {
         direChannel.members.forEach(guildMember => guildMember.voice.setChannel('807063354493108257'));
     }
 
+    // Begin match
     if ((msg.content === '!dui' || msg.content === '!dui balanced' || msg.content === '!dui random') && !inSession) {
         let commands = msg.content.split(" ");
         inSession = true;
@@ -116,6 +117,7 @@ bot.on('message', msg => {
         msg.channel.send('Session already in progress. Use !winner [side] to pick a winner, or !terminate to cancel.');
     }
 
+    // End match with a winner
     if ((msg.content === '!winner dire' || msg.content === '!winner radiant') && inSession) {
         let winningTeam = msg.content.split(" ")[1];
         let losingTeam = winningTeam === 'radiant' ? 'dire' : 'radiant';
@@ -161,7 +163,8 @@ bot.on('message', msg => {
     } else if ((msg.content === '!winner dire' || msg.content === '!winner radiant') && !inSession) {
         msg.channel.send('No session in progress. Use !dui command to start a session.')
     }
-
+    
+    // End match without a winner
     if (msg.content === '!terminate' && inSession) {
         msg.channel.send('Session terminated. Beep boop.');
         split = {};
@@ -171,6 +174,7 @@ bot.on('message', msg => {
         msg.channel.send('No session in progress. Use !dui command to start a session.')
     }
 
+    // Help
     if (msg.content === '!dui help') {
         msg.channel.send("Commands (square brackets indicate user input):\n\n" + 
         "!dui [balanced/random]: Starts a DUI session. Moves players in Main Lobby into their respective channels.\n\n" + 
@@ -185,9 +189,5 @@ bot.on('message', msg => {
     msg.reply: tags the initial user who has sent the message
     msg.channel.send: sends a message to the channel without tagging anyone
 
-    UPDATE UserData
-    SET winrate = won::real / (won::real + lost::real)
-    WHERE username = 'Tornope';
-
-    member.voice.setChannel('807068609377206332');
+    member.voice.setChannel('channel id'): Move player to channel
 */
